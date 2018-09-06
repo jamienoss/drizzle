@@ -13,6 +13,8 @@ from __future__ import division, print_function, unicode_literals, absolute_impo
 import os
 import os.path
 
+import collections
+
 # THIRD-PARTY
 
 import numpy as np
@@ -312,7 +314,7 @@ class Drizzle(object):
 
         inwht : array, optional
             A 2d numpy array containing the pixel by pixel weighting.
-            Must have the same dimenstions as insci. If none is supplied,
+            Must have the same dimensions as insci. If none is supplied,
             the weghting is set to one.
 
         xmin : float, optional
@@ -584,3 +586,106 @@ class Drizzle(object):
 
         handle.writeto(outfile, overwrite=True)
         handle.close()
+
+def drizzle(image, in_wcs, out_wcs, scale="exptime", pixel_fraction=1.0,
+                 kernel="square", fill_value="INDEF", weight=None,
+                 xmin=0, xmax=0, ymin=0, ymax=0, exposure_time=1.0, units="cps"):
+    """
+    Drizzle image.
+
+    Parameters
+    ----------
+
+    image : array
+            A 2d numpy array containing the input image to be drizzled.
+            it is an error to not supply an image.
+
+    in_wcs : wcs
+            The world coordinate system of the input image. This is
+            used to convert the pixels to the output coordinate system.
+
+    out_wcs : wcs
+        The world coordinate system (WCS) of the combined image.
+
+    scale : str, optional
+        How each input image should be scaled. The choices are `exptime`
+        which scales each image by its exposure time, `expsq` which scales
+        each image by the exposure time squared.
+
+    pixel_fraction : float, optional
+        The fraction of a pixel that the pixel flux is confined to. The
+        default value of 1 has the pixel flux evenly spread across the image.
+        A value of 0.5 confines it to half a pixel in the linear dimension,
+        so the flux is confined to a quarter of the pixel area when the square
+        kernel is used.
+
+    kernel : str, optional
+        The name of the kernel used to combine the inputs. The choice of
+        kernel controls the distribution of flux over the kernel. The kernel
+        names are: "square", "gaussian", "point", "tophat", "turbo", "lanczos2",
+        and "lanczos3". The square kernel is the default.
+
+    fill_value : str, otional
+        The value a pixel is set to in the output if the input image does
+        not overlap it. The default value of INDEF does not set a value.
+
+    weight : array, optional
+        A 2d numpy array containing the pixel by pixel weighting.
+        Must have the same dimensions as image. If none is supplied,
+        the weghting is set to one.
+
+    xmin : float, optional
+        This and the following three parameters set a bounding rectangle
+        on the output image. Only pixels on the output image inside this
+        rectangle will have their flux updated. Xmin sets the minimum value
+        of the x dimension. The x dimension is the dimension that varies
+        quickest on the image. If the value is zero or less, no minimum will
+        be set in the x dimension. All four parameters are zero based,
+        counting starts at zero.
+
+    xmax : float, optional
+        Sets the maximum value of the x dimension on the bounding box
+        of the ouput image. If the value is zero or less, no maximum will
+        be set in the x dimension.
+
+    ymin : float, optional
+        Sets the minimum value in the y dimension on the bounding box. The
+        y dimension varies less rapidly than the x and represents the line
+        index on the output image. If the value is zero or less, no minimum
+        will be set in the y dimension.
+
+    ymax : float, optional
+        Sets the maximum value in the y dimension. If the value is zero or
+        less, no maximum will be set in the y dimension.
+
+    exposure_time : float, optional
+        The exposure time of the input image, a positive number. The
+        exposure time is used to scale the image if the units are counts and
+        to scale the image weighting if the drizzle was initialized with
+        weight equal to "exptime" or "expsq".
+
+    units : str, optional
+        The units of the input image. The units can either be "counts"
+        or "cps" (counts per second.) If the value is counts, before using
+        the input image it is scaled by dividing it by the exposure time.
+
+    Results
+    -------
+    Drizzle.outsci : `~numpy.ndarray`
+        Resultant drizzled image
+    Drizzle.outwht : `~numpy.ndarray`
+        Array containing the output counts.
+    Drizzle.outcon : `~numpy.ndarray`
+        Array holding a bitmap of which image was an input
+        for each output pixel.
+    """
+
+    container = Drizzle(infile="", outwcs=out_wcs, wt_scl=scale,
+                        pixfrac=pixel_fraction, kernel=kernel,
+                        fillval=fill_value)
+
+    container.add_image(image, in_wcs, inwht=weight,
+                        xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax,
+                        expin=exposure_time, in_units=units)
+
+    return container.outsci, container.outwht, container.outcon

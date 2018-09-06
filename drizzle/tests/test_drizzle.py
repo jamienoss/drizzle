@@ -212,7 +212,30 @@ def read_wcs(filename):
     the_wcs = wcs.WCS(hdu[1].header)
     hdu.close()
     return the_wcs
-    
+
+def test_drizzle():
+    """
+    Test drizzle
+    """
+    input_file = os.path.join(DATA_DIR, 'j8bt06nyq_flt.fits')
+    output_difference = os.path.join(OUTPUT_DIR, 'difference_square_point.txt')
+    output_template = os.path.join(DATA_DIR, 'reference_square_point.fits')
+
+    insci = read_image(input_file)
+    inwcs = read_wcs(input_file)
+    insci = make_point_image(insci, (500, 200), 100.0)
+    inwht = np.ones(insci.shape,dtype=insci.dtype)
+    output_wcs = read_wcs(output_template)
+
+    drizzled_image = drizzle.drizzle(insci, inwcs, output_wcs, weight=inwht)
+
+    template_data = read_image(output_template)
+    (min_diff, med_diff, max_diff) = centroid_statistics("square with point", output_difference,
+                                                                  drizzled_image, template_data, 20.0, 8)
+
+    assert(med_diff < 1.0e-6)
+    assert(max_diff < 1.0e-5)
+
 def test_square_with_point():
     """
     Test do_driz square kernel with point
@@ -553,7 +576,8 @@ if __name__ == "__main__":
     for flag in sys.argv[1:]:
         if flag == 'ok':
             ok = True
-            
+
+    test_drizzle()
     test_square_with_point()
     test_square_with_grid()
     test_turbo_with_grid()
